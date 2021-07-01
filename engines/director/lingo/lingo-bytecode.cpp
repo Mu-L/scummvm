@@ -358,7 +358,7 @@ Datum Lingo::findVarV4(int varType, const Datum &id) {
 		}
 		break;
 	case 6: // field
-		res = id.asCastId();
+		res = id.asMemberID();
 		res.type = FIELDREF;
 		break;
 	default:
@@ -396,7 +396,7 @@ void LC::cb_delete() {
 }
 
 void LC::cb_hilite() {
-	Datum fieldID = g_lingo->pop().asCastId();
+	Datum fieldID = g_lingo->pop().asMemberID();
 	fieldID.type = FIELDREF;
 	Datum chunkRef = readChunkRef(fieldID);
 	g_lingo->push(chunkRef);
@@ -721,7 +721,7 @@ void LC::cb_v4theentitypush() {
 		case kTEAString:
 			{
 				Datum stringArg = g_lingo->pop();
-				ChunkType chunkType;
+				ChunkType chunkType = kChunkChar;
 				switch (entity) {
 				case kTheChars:
 					chunkType = kChunkChar;
@@ -756,7 +756,7 @@ void LC::cb_v4theentitypush() {
 			break;
 		case kTEAChunk:
 			{
-				Datum fieldRef = g_lingo->pop().asCastId();
+				Datum fieldRef = g_lingo->pop().asMemberID();
 				fieldRef.type = FIELDREF;
 				Datum chunkRef = readChunkRef(fieldRef);
 				result = g_lingo->getTheEntity(entity, chunkRef, field);
@@ -862,7 +862,7 @@ void LC::cb_v4theentityassign() {
 		break;
 	case kTEAChunk:
 		{
-			Datum fieldRef = g_lingo->pop().asCastId();
+			Datum fieldRef = g_lingo->pop().asMemberID();
 			fieldRef.type = FIELDREF;
 			Datum chunkRef = readChunkRef(fieldRef);
 			g_lingo->setTheEntity(entity, chunkRef, field, value);
@@ -965,14 +965,14 @@ ScriptContext *LingoCompiler::compileLingoV4(Common::SeekableReadStreamEndian &s
 	// initialise the script
 	ScriptType scriptType = kCastScript;
 	Common::String castName;
-	CastMember *member = g_director->getCurrentMovie()->getCastMemberByScriptId(scriptId);
+	CastMember *member = archive->cast->getCastMemberByScriptId(scriptId);
 	int castId;
 	if (member) {
 		if (member->_type == kCastLingoScript)
 			scriptType = ((ScriptCastMember *)member)->_scriptType;
 
 		castId = member->getID();
-		CastMemberInfo *info = g_director->getCurrentMovie()->getCastMemberInfo(castId);
+		CastMemberInfo *info = member->getInfo();
 		if (info)
 			castName = info->name;
 	} else {
