@@ -34,24 +34,27 @@ public:
 	uint16 screenWidth() const { return _screenW; }
 	uint16 screenHeight() const { return _screenH; }
 	uint16 numColors() const { return _numColors; }
-	uint8 hAlignment() const { return _hAlign; }
-
+	byte hAlignment() const { return _hAlign; }
+	
+	virtual bool allowRGBRendering() const = 0;
 	virtual void setPalette(const byte *colors, uint start, uint num) = 0;
 	virtual void copyRectToScreen(const byte *src, int pitch, int x, int y, int w, int h) = 0;
 	virtual void replaceCursor(const void *cursor, uint w, uint h, int hotspotX, int hotspotY, uint32 keycolor) = 0;
 	virtual Common::Point getMousePos() const;
+	virtual void clearRect(const Common::Rect &r) const;
 
 protected:
 	const uint16 _screenW;
 	const uint16 _screenH;
 	uint16 _numColors;
-	const uint8 _hAlign;
+	const byte _hAlign;
 };
 
 class GfxDefaultDriver final : public GfxDriver {
 public:
 	GfxDefaultDriver(uint16 screenWidth, uint16 screenHeight);
 	~GfxDefaultDriver() override {}
+	bool allowRGBRendering() const override { return true; }
 	void setPalette(const byte *colors, uint start, uint num) override;
 	void copyRectToScreen(const byte *src, int pitch, int x, int y, int w, int h) override;
 	void replaceCursor(const void *cursor, uint w, uint h, int hotspotX, int hotspotY, uint32 keycolor) override;
@@ -61,6 +64,7 @@ class SCI0_DOSPreVGADriver : public GfxDriver {
 public:
 	SCI0_DOSPreVGADriver(int numColors, int screenW, int screenH, int horizontalAlignment);
 	~SCI0_DOSPreVGADriver() override;
+	bool allowRGBRendering() const override { return false; }
 	void setPalette(const byte*, uint, uint) override;
 protected:
 	static bool checkDriver(const char *const *driverNames, int listSize);
@@ -69,14 +73,6 @@ protected:
 private:
 	bool _palNeedUpdate;
 	const byte *_colors;
-};
-
-class SCI0_EGADriver final : public SCI0_DOSPreVGADriver {
-public:
-	SCI0_EGADriver();
-	~SCI0_EGADriver() override {}
-	void copyRectToScreen(const byte *src, int pitch, int x, int y, int w, int h) override;
-	void replaceCursor(const void *cursor, uint w, uint h, int hotspotX, int hotspotY, uint32 keycolor) override;
 };
 
 class SCI0_CGADriver final : public SCI0_DOSPreVGADriver {
@@ -100,6 +96,7 @@ public:
 	void copyRectToScreen(const byte *src, int pitch, int x, int y, int w, int h) override;
 	void replaceCursor(const void *cursor, uint w, uint h, int hotspotX, int hotspotY, uint32 keycolor) override;
 	Common::Point getMousePos() const override;
+	void clearRect(const Common::Rect &r) const override;
 	static bool validateMode() { return checkDriver(_driverFiles, 2); }
 private:
 	const byte *_monochromePatterns;
@@ -114,6 +111,7 @@ public:
 	void copyRectToScreen(const byte *src, int pitch, int x, int y, int w, int h) override;
 	void replaceCursor(const void *cursor, uint w, uint h, int hotspotX, int hotspotY, uint32 keycolor) override;
 	Common::Point getMousePos() const override;
+	void clearRect(const Common::Rect &r) const override;
 	static bool validateMode() { return checkDriver(&_driverFile, 1); }
 private:
 	const byte *_monochromePatterns;

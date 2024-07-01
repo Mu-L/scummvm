@@ -36,6 +36,10 @@ Common::Point GfxDriver::getMousePos() const {
 	return g_system->getEventManager()->getMousePos();
 }
 
+void GfxDriver::clearRect(const Common::Rect &r) const {
+	g_system->fillScreen(r, 0);
+}
+
 GfxDefaultDriver::GfxDefaultDriver(uint16 screenWidth, uint16 screenHeight) : GfxDriver(screenWidth, screenHeight, 0, 1) {
 	switch (g_sci->getResMan()->getViewType()) {
 	case kViewEga:
@@ -100,41 +104,12 @@ void SCI0_DOSPreVGADriver::assignPalette(const byte *colors) {
 void SCI0_DOSPreVGADriver::setPalette(const byte*, uint, uint) {
 	if (!_palNeedUpdate || !_colors)
 		return;
-	_palNeedUpdate = false;
-	byte *tmp = new byte[768]();
-	memcpy(tmp, _colors, _numColors * 3);
-	g_system->getPaletteManager()->setPalette(tmp, 0, 256);
-	delete[]tmp;
-}
-
-SCI0_EGADriver::SCI0_EGADriver() : SCI0_DOSPreVGADriver(16, 320, 200, 1) {
-	static const uint8 egaColors[] = {
-		0x00, 0x00, 0x00, 0x00, 0x00, 0xAA, 0x00, 0xAA, 0x00, 0x00, 0xAA, 0xAA,
-		0xAA, 0x00, 0x00, 0xAA, 0x00, 0xAA, 0xAA, 0x55, 0x00, 0xAA, 0xAA, 0xAA,
-		0x55, 0x55, 0x55, 0x55, 0x55, 0xFF, 0x55, 0xFF, 0x55, 0x55, 0xFF, 0xFF,
-		0xFF, 0x55, 0x55, 0xFF, 0x55, 0xFF, 0xFF, 0xFF, 0x55, 0xFF, 0xFF, 0xFF
-	};
-	assignPalette(egaColors);
-}
-
-void SCI0_EGADriver::copyRectToScreen(const byte *src, int pitch, int x, int y, int w, int h) {
-	byte *dst = _compositeBuffer;
-	pitch -= w;
-	for (int i = 0; i < h; ++i) {
-		for (int ii = 0; ii < w; ++ii)
-			*dst++ = *src++;
-		src += pitch;
-	}
-
-	g_system->copyRectToScreen(_compositeBuffer, w, x, y, w, h);
-}
-
-void SCI0_EGADriver::replaceCursor(const void *cursor, uint w, uint h, int hotspotX, int hotspotY, uint32 keycolor) {
-	CursorMan.replaceCursor(cursor, w, h, hotspotX, hotspotY, keycolor);
+	_palNeedUpdate = false;;
+	g_system->getPaletteManager()->setPalette(_colors, 0, _numColors);
 }
 
 SCI0_CGADriver::SCI0_CGADriver(bool emulateCGAModeOnEGACard) : SCI0_DOSPreVGADriver(4, 320, 200, 1), _cgaPatterns(nullptr), _disableMode5(emulateCGAModeOnEGACard) {
-	static const uint8 cgaColors[48] = {
+	static const byte cgaColors[48] = {
 		/*
 		// Canonical CGA palette
 		0x00, 0x00, 0x00, 0x00, 0x00, 0xAA, 0x00, 0xAA, 0x00, 0x00, 0xAA, 0xAA,
@@ -149,7 +124,7 @@ SCI0_CGADriver::SCI0_CGADriver(bool emulateCGAModeOnEGACard) : SCI0_DOSPreVGADri
 		0xDC, 0x4E, 0x4E, 0xF3, 0x4E, 0xF3, 0xF3, 0xF3, 0x4E, 0xFF, 0xFF, 0xFF
 	};
 
-	static const uint8 modeColorMap[3][4] = {
+	static const byte modeColorMap[3][4] = {
 		{ 0, 2, 4, 6 },
 		{ 0, 3, 5, 7 },
 		{ 0, 3, 4, 7 }
@@ -163,7 +138,7 @@ SCI0_CGADriver::SCI0_CGADriver(bool emulateCGAModeOnEGACard) : SCI0_DOSPreVGADri
 	byte palIntensity = 1;
 	byte mode = 4;
 
-	uint8 colMap[4];
+	byte colMap[4];
 	memset(colMap, 0, sizeof(colMap));
 
 	uint16 eprcOffs = 0;
@@ -247,9 +222,9 @@ void SCI0_CGADriver::copyRectToScreen(const byte *src, int pitch, int x, int y, 
 		for (int ii = 0; ii < (w >> 1); ++ii) {
 			uint16 pattern = _cgaPatterns[((src[0] & 0x0f) << 4) | (src[1] & 0x0f)];
 			src += 2;
-			uint8 sh = (ty & 3) << 1;
-			uint8 lo = ((pattern & 0xff) >> sh) | ((pattern & 0xff) << (8 - sh));
-			uint8 hi = (pattern >> (8 + sh)) | ((pattern >> 8) << (8 - sh));
+			byte sh = (ty & 3) << 1;
+			byte lo = ((pattern & 0xff) >> sh) | ((pattern & 0xff) << (8 - sh));
+			byte hi = (pattern >> (8 + sh)) | ((pattern >> 8) << (8 - sh));
 			*dst++ = (lo >> (6 - (tx << 1))) & 3;
 			*dst++ = (hi >> (4 - (tx << 1))) & 3;
 			tx ^= 2;
@@ -266,7 +241,7 @@ void SCI0_CGADriver::replaceCursor(const void *cursor, uint w, uint h, int hotsp
 	// driver class and implemented again for each mode, but I don't see the benefit. Instead,
 	// we simply convert the colors as needed...
 	assert(keycolor == 1);
-	const byte *s = reinterpret_cast<const uint8 *>(cursor);
+	const byte *s = reinterpret_cast<const byte*>(cursor);
 	byte *d = _compositeBuffer;
 	for (uint i = w * h; i; --i)
 		*d++ = *s++ & 3;
@@ -321,7 +296,7 @@ const byte *monochrInit(const char *drvFile, bool &earlyVersion) {
 }
 
 SCI0_CGABWDriver::SCI0_CGABWDriver() : SCI0_DOSPreVGADriver(2, 640, 400, 1), _monochromePatterns(nullptr), _earlyVersion(false) {
-	static const uint8 monochromePalette[6] = {
+	static const byte monochromePalette[6] = {
 		0x00, 0x00, 0x00, 0xFF, 0xFF, 0xFF
 	};
 	assignPalette(monochromePalette);
@@ -351,9 +326,9 @@ void SCI0_CGABWDriver::copyRectToScreen(const byte *src, int pitch, int x, int y
 			for (int ii = 0; ii < (w >> 1); ++ii) {
 				uint16 p16 = reinterpret_cast<const uint16*>(_monochromePatterns)[((src[0] & 0x0f) << 4) | (src[1] & 0x0f)];
 				src += 2;
-				uint8 sh = (ty & 3) << 1;
-				uint8 lo = ((p16 & 0xff) >> sh) | ((p16 & 0xff) << (8 - sh));
-				uint8 hi = (p16 >> (8 + sh)) | ((p16 >> 8) << (8 - sh));
+				byte sh = (ty & 3) << 1;
+				byte lo = ((p16 & 0xff) >> sh) | ((p16 & 0xff) << (8 - sh));
+				byte hi = (p16 >> (8 + sh)) | ((p16 >> 8) << (8 - sh));
 				*dst1++ = *dst2++ = ((lo >> (6 - (tx << 1))) >> 1) & 1;
 				*dst1++ = *dst2++ = (lo >> (6 - (tx << 1))) & 1;
 				*dst1++ = *dst2++ = ((hi >> (4 - (tx << 1))) >> 1) & 1;
@@ -362,7 +337,7 @@ void SCI0_CGABWDriver::copyRectToScreen(const byte *src, int pitch, int x, int y
 			}
 		} else {
 			for (int ii = 0; ii < w; ++ii) {
-				uint8 p = _monochromePatterns[((*src++ & 0x0f) << 3) + ty] >> (6 - (tx << 1));
+				byte p = _monochromePatterns[((*src++ & 0x0f) << 3) + ty] >> (6 - (tx << 1));
 				*dst1++ = *dst2++ = (p >> 1) & 1;
 				*dst1++ = *dst2++ = p & 1;
 				tx = (tx + 1) & 3;
@@ -385,7 +360,7 @@ void SCI0_CGABWDriver::replaceCursor(const void *cursor, uint w, uint h, int hot
 	assert(keycolor == 1);
 	keycolor = 0x0f;
 	w <<= 1;
-	const byte *s = reinterpret_cast<const uint8*>(cursor);
+	const byte *s = reinterpret_cast<const byte*>(cursor);
 	byte *d0 = _compositeBuffer;
 	byte *d1 = _compositeBuffer + w;
 
@@ -409,10 +384,15 @@ Common::Point SCI0_CGABWDriver::getMousePos() const {
 	return res;
 }
 
+void SCI0_CGABWDriver::clearRect(const Common::Rect &r) const {
+	Common::Rect r2(r.left << 1, r.top << 1, r.right << 1, r.bottom << 1);
+	GfxDriver::clearRect(r2);
+}
+
 const char *SCI0_CGABWDriver::_driverFiles[2] = { "CGA320BW.DRV", "CGA320M.DRV" };
 
 SCI0_HerculesDriver::SCI0_HerculesDriver(int palIndex) : SCI0_DOSPreVGADriver(2, 720, 350, 0), _monochromePatterns(nullptr) {
-	static const uint8 monochromePalettes[3][6] = {
+	static const byte monochromePalettes[3][6] = {
 		{ 0x00, 0x00, 0x00, 0xFF, 0xBF, 0x66 }, // Amber
 		{ 0x00, 0x00, 0x00, 0x66, 0xFF, 0x66 }, // Green
 		{ 0x00, 0x00, 0x00, 0xFF, 0xFF, 0xFF }  // B/W
@@ -444,7 +424,7 @@ void SCI0_HerculesDriver::copyRectToScreen(const byte *src, int pitch, int x, in
 		const byte *src2 = src;
 		int tx = x & 3;
 		for (int ii = 0; ii < w; ++ii) {
-			uint8 p = _monochromePatterns[((*src2++ & 0x0f) << 3) + ty] >> (6 - (tx << 1));
+			byte p = _monochromePatterns[((*src2++ & 0x0f) << 3) + ty] >> (6 - (tx << 1));
 			*dst++ = (p >> 1) & 1;
 			*dst++ = p & 1;
 			tx = (tx + 1) & 3;
@@ -475,7 +455,7 @@ void SCI0_HerculesDriver::replaceCursor(const void *cursor, uint w, uint h, int 
 	assert(keycolor == 1);
 	keycolor = 0x0f;
 	int alt = 0;
-	const byte *s = reinterpret_cast<const uint8 *>(cursor);
+	const byte *s = reinterpret_cast<const byte *>(cursor);
 	byte *d = _compositeBuffer;
 
 	for (uint i = 0; i < h; ++i) {
@@ -501,6 +481,11 @@ Common::Point SCI0_HerculesDriver::getMousePos() const {
 	res.x = CLIP<int>(res.x - 40, 0, 639) >> 1;
 	res.y = CLIP<int>(res.y - 25, 0, 299) * 2 / 3;
 	return res;
+}
+
+void SCI0_HerculesDriver::clearRect(const Common::Rect &r) const {
+	Common::Rect r2((r.left << 1) + 40, (r.top & ~1) * 3 / 2 + (r.top & 1) + 25, (r.right << 1) + 40, (r.bottom & ~1) * 3 / 2 + (r.bottom & 1) + 25);
+	GfxDriver::clearRect(r2);
 }
 
 const char *SCI0_HerculesDriver::_driverFile = "HERCMONO.DRV";

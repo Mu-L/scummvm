@@ -30,16 +30,25 @@
 #include "backends/keymapper/standard-actions.h"
 
 #include "engines/advancedDetector.h"
-#include "engines/obsolete.h"
 
 #include "agos/intern.h"
 #include "agos/agos.h"
 #include "agos/detection.h"
-#include "agos/obsolete.h"
 
 namespace AGOS {
 
 static const ADExtraGuiOptionsMap optionsList[] = {
+	{
+		GAMEOPTION_COPY_PROTECTION,
+		{
+			_s("Enable copy protection"),
+			_s("Enable any copy protection that would otherwise be bypassed by default."),
+			"copy_protection",
+			false,
+			0,
+			0
+		},
+	},
 	{
 		GAMEOPTION_OPL3_MODE,
 		{
@@ -100,7 +109,7 @@ static const ADExtraGuiOptionsMap optionsList[] = {
 
 } // End of namespace AGOS
 
-class AgosMetaEngine : public AdvancedMetaEngine {
+class AgosMetaEngine : public AdvancedMetaEngine<AGOS::AGOSGameDescription> {
 public:
 	const char *getName() const override {
 		return "agos";
@@ -112,11 +121,7 @@ public:
 
 	bool hasFeature(MetaEngineFeature f) const override;
 
-	Common::Error createInstance(OSystem *syst, Engine **engine) override {
-		Engines::upgradeTargetIfNecessary(obsoleteGameIDsTable);
-		return AdvancedMetaEngine::createInstance(syst, engine);
-	}
-	Common::Error createInstance(OSystem *syst, Engine **engine, const ADGameDescription *desc) const override;
+	Common::Error createInstance(OSystem *syst, Engine **engine, const AGOS::AGOSGameDescription *desc) const override;
 
 	SaveStateList listSaves(const char *target) const override;
 	int getMaximumSaveSlot() const override;
@@ -135,9 +140,7 @@ bool AGOS::AGOSEngine::hasFeature(EngineFeature f) const {
 		(f == kSupportsReturnToLauncher);
 }
 
-Common::Error AgosMetaEngine::createInstance(OSystem *syst, Engine **engine, const ADGameDescription *desc) const {
-	const AGOS::AGOSGameDescription *gd = (const AGOS::AGOSGameDescription *)desc;
-
+Common::Error AgosMetaEngine::createInstance(OSystem *syst, Engine **engine, const AGOS::AGOSGameDescription *gd) const {
 	switch (gd->gameType) {
 	case AGOS::GType_PN:
 		*engine = new AGOS::AGOSEngine_PN(syst, gd);

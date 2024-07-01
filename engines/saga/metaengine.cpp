@@ -41,6 +41,20 @@
 
 namespace Saga {
 
+static const ADExtraGuiOptionsMap optionsList[] = {
+	{
+		GAMEOPTION_COPY_PROTECTION,
+		{
+			_s("Enable copy protection"),
+			_s("Enable any copy protection that would otherwise be bypassed by default."),
+			"copy_protection",
+			false,
+			0,
+			0
+		},
+	}
+};
+
 bool SagaEngine::isBigEndian() const { return (isMacResources() || (getPlatform() == Common::kPlatformAmiga)) && getGameId() == GID_ITE; }
 bool SagaEngine::isMacResources() const { return (getPlatform() == Common::kPlatformMacintosh); }
 
@@ -71,15 +85,19 @@ const ADGameFileDescription *SagaEngine::getArchivesDescriptions() const {
 
 } // End of namespace Saga
 
-class SagaMetaEngine : public AdvancedMetaEngine {
+class SagaMetaEngine : public AdvancedMetaEngine<Saga::SAGAGameDescription> {
 public:
 	const char *getName() const override {
 		return "saga";
 	}
 
+	const ADExtraGuiOptionsMap *getAdvancedExtraGuiOptions() const override {
+		return Saga::optionsList;
+	}
+
 	bool hasFeature(MetaEngineFeature f) const override;
 
-	Common::Error createInstance(OSystem *syst, Engine **engine, const ADGameDescription *desc) const override;
+	Common::Error createInstance(OSystem *syst, Engine **engine, const Saga::SAGAGameDescription *desc) const override;
 
 	SaveStateList listSaves(const char *target) const override;
 	int getMaximumSaveSlot() const override;
@@ -105,9 +123,7 @@ bool Saga::SagaEngine::hasFeature(EngineFeature f) const {
 		(f == kSupportsSavingDuringRuntime);
 }
 
-Common::Error SagaMetaEngine::createInstance(OSystem *syst, Engine **engine, const ADGameDescription *desc) const {
-	const Saga::SAGAGameDescription *gd = (const Saga::SAGAGameDescription *)desc;
-
+Common::Error SagaMetaEngine::createInstance(OSystem *syst, Engine **engine, const Saga::SAGAGameDescription *gd) const {
 	switch (gd->gameId) {
 	case Saga::GID_IHNM:
 #ifndef ENABLE_IHNM

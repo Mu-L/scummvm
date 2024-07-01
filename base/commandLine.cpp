@@ -1026,8 +1026,8 @@ static void listGames(const Common::String &engineID) {
 
 	const PluginList &plugins = EngineMan.getPlugins(PLUGIN_TYPE_ENGINE);
 	for (PluginList::const_iterator iter = plugins.begin(); iter != plugins.end(); ++iter) {
-		const Plugin *p = EngineMan.findPlugin((*iter)->getName());
-		/* If for some reason, we can't find the MetaEngine for this Engine, just ignore it */
+		const Plugin *p = EngineMan.findDetectionPlugin((*iter)->getName());
+		/* If for some reason, we can't find the MetaEngineDetection for this Engine, just ignore it */
 		if (!p) {
 			continue;
 		}
@@ -1053,7 +1053,7 @@ static void listAllGames(const Common::String &engineID) {
 	printf("Game ID                        Full Title                                                 \n"
 	       "------------------------------ -----------------------------------------------------------\n");
 
-	const PluginList &plugins = EngineMan.getPlugins();
+	const PluginList &plugins = EngineMan.getPlugins(PLUGIN_TYPE_ENGINE_DETECTION);
 	for (PluginList::const_iterator iter = plugins.begin(); iter != plugins.end(); ++iter) {
 		const MetaEngineDetection &metaEngine = (*iter)->get<MetaEngineDetection>();
 
@@ -1073,8 +1073,8 @@ static void listEngines() {
 
 	const PluginList &plugins = EngineMan.getPlugins(PLUGIN_TYPE_ENGINE);
 	for (PluginList::const_iterator iter = plugins.begin(); iter != plugins.end(); ++iter) {
-		const Plugin *p = EngineMan.findPlugin((*iter)->getName());
-		/* If for some reason, we can't find the MetaEngine for this Engine, just ignore it */
+		const Plugin *p = EngineMan.findDetectionPlugin((*iter)->getName());
+		/* If for some reason, we can't find the MetaEngineDetection for this Engine, just ignore it */
 		if (!p) {
 			continue;
 		}
@@ -1088,7 +1088,7 @@ static void listAllEngines() {
 	printf("Engine ID       Engine Name                                           \n"
 	       "--------------- ------------------------------------------------------\n");
 
-	const PluginList &plugins = EngineMan.getPlugins();
+	const PluginList &plugins = EngineMan.getPlugins(PLUGIN_TYPE_ENGINE_DETECTION);
 	for (PluginList::const_iterator iter = plugins.begin(); iter != plugins.end(); ++iter) {
 		const MetaEngineDetection &metaEngine = (*iter)->get<MetaEngineDetection>();
 		printf("%-15s %s\n", metaEngine.getName(), metaEngine.getEngineName());
@@ -1178,7 +1178,7 @@ static void printStatistics(const Common::String &engineID) {
 
 	bool approximation = false;
 	int engineCount = 0, gameCount = 0, variantCount = 0;
-	const PluginList &plugins = EngineMan.getPlugins();
+	const PluginList &plugins = EngineMan.getPlugins(PLUGIN_TYPE_ENGINE_DETECTION);
 	for (PluginList::const_iterator iter = plugins.begin(); iter != plugins.end(); ++iter) {
 		const MetaEngineDetection &metaEngine = (*iter)->get<MetaEngineDetection>();
 		if (summary || all || Common::find(engines.begin(), engines.end(), metaEngine.getName()) != engines.end()) {
@@ -1226,7 +1226,7 @@ static void listDebugFlags(const Common::String &engineID) {
 	if (engineID == "global")
 		printDebugFlags(gDebugChannels);
 	else {
-		const PluginList &plugins = EngineMan.getPlugins();
+		const PluginList &plugins = EngineMan.getPlugins(PLUGIN_TYPE_ENGINE_DETECTION);
 		for (PluginList::const_iterator iter = plugins.begin(); iter != plugins.end(); ++iter) {
 			const MetaEngineDetection &metaEngine = (*iter)->get<MetaEngineDetection>();
 			if (metaEngine.getName() == engineID) {
@@ -1245,7 +1245,7 @@ static void listDebugFlags(const Common::String &engineID) {
 static void listAllEngineDebugFlags() {
 	printf("Flag name       Flag description                                           \n");
 
-	const PluginList &plugins = EngineMan.getPlugins();
+	const PluginList &plugins = EngineMan.getPlugins(PLUGIN_TYPE_ENGINE_DETECTION);
 	for (PluginList::const_iterator iter = plugins.begin(); iter != plugins.end(); ++iter) {
 		const MetaEngineDetection &metaEngine = (*iter)->get<MetaEngineDetection>();
 		printf("--------------- ------------------------------------------------------\n");
@@ -1290,8 +1290,7 @@ static Common::Error listRecords(const Common::String &singleTarget) {
 			// The name is a known target
 			currentTarget = *i;
 			EngineMan.upgradeTargetIfNecessary(*i);
-			const Plugin *metaEnginePlugin = nullptr;
-			game = EngineMan.findTarget(*i, &metaEnginePlugin);
+			game = EngineMan.findTarget(*i);
 		} else if (game = findGameMatchingName(*i), !game.gameId.empty()) {
 			currentTarget = createTemporaryTarget(game.engineId, game.gameId);
 		} else {
@@ -1330,6 +1329,12 @@ static Common::Error listSaves(const Common::String &singleTarget) {
 
 	Common::String oldDomain = ConfMan.getActiveDomainName();
 
+	struct GameTarget {
+		Common::String target;
+		QualifiedGameDescriptor game;
+	};
+	Common::Array<GameTarget> gameTargets;
+
 	bool atLeastOneFound = false;
 	for (Common::Array<Common::String>::const_iterator i = targets.begin(), end = targets.end(); i != end; ++i) {
 		// Check whether there is either a game domain (i.e. a target) matching
@@ -1337,65 +1342,66 @@ static Common::Error listSaves(const Common::String &singleTarget) {
 		Common::String currentTarget;
 		QualifiedGameDescriptor game;
 
-		const Plugin *metaEnginePlugin = nullptr;
-		const Plugin *enginePlugin = nullptr;
-
 		if (ConfMan.hasGameDomain(*i)) {
 			// The name is a known target
 			currentTarget = *i;
 			EngineMan.upgradeTargetIfNecessary(*i);
-			game = EngineMan.findTarget(*i, &metaEnginePlugin);
+			game = EngineMan.findTarget(*i);
 		} else if (game = findGameMatchingName(*i), !game.gameId.empty()) {
 			// The name is a known game id
-			metaEnginePlugin = EngineMan.findPlugin(game.engineId);
 			currentTarget = createTemporaryTarget(game.engineId, game.gameId);
 		} else {
 			return Common::Error(Common::kEnginePluginNotFound, Common::String::format("target '%s'", singleTarget.c_str()));
 		}
+		gameTargets.push_back({currentTarget, game});
+	}
+
+#if defined(UNCACHED_PLUGINS) && defined(DYNAMIC_MODULES) && !defined(DETECTION_STATIC)
+	// Unload all MetaEnginesDetection if we're using uncached plugins to save extra memory.
+	PluginMan.unloadDetectionPlugin();
+#endif
+
+	for (Common::Array<GameTarget>::const_iterator i = gameTargets.begin(), end = gameTargets.end(); i != end; ++i) {
+		const Plugin *enginePlugin = nullptr;
 
 		// If we actually found a domain, we're going to change the domain
-		ConfMan.setActiveDomain(currentTarget);
+		ConfMan.setActiveDomain(i->target);
 
-		if (!metaEnginePlugin) {
+		enginePlugin = PluginMan.findEnginePlugin(i->game.engineId);
+
+		if (!enginePlugin) {
 			// If the target was specified, treat this as an error, and otherwise skip it.
-			if (!singleTarget.empty())
-				return Common::Error(Common::kMetaEnginePluginNotFound,
-				                     Common::String::format("target '%s'", i->c_str()));
-			printf("MetaEnginePlugin could not be loaded for target '%s'\n", i->c_str());
-			continue;
-		} else {
-			enginePlugin = PluginMan.getEngineFromMetaEngine(metaEnginePlugin);
-
-			if (!enginePlugin) {
-				// If the target was specified, treat this as an error, and otherwise skip it.
-				if (!singleTarget.empty())
-					return Common::Error(Common::kEnginePluginNotFound,
-				                     	 Common::String::format("target '%s'", i->c_str()));
-				printf("EnginePlugin could not be loaded for target '%s'\n", i->c_str());
-				continue;
+			if (!singleTarget.empty()) {
+				result = Common::Error(Common::kEnginePluginNotFound,
+						 Common::String::format("target '%s'", i->target.c_str()));
+				break;
 			}
+			printf("EnginePlugin could not be loaded for target '%s'\n", i->target.c_str());
+			continue;
 		}
 
 		const MetaEngine &metaEngine = enginePlugin->get<MetaEngine>();
-		Common::String qualifiedGameId = buildQualifiedGameName(game.engineId, game.gameId);
+		Common::String qualifiedGameId = buildQualifiedGameName(i->game.engineId, i->game.gameId);
 
 		if (!metaEngine.hasFeature(MetaEngine::kSupportsListSaves)) {
 			// If the target was specified, treat this as an error, and otherwise skip it.
-			if (!singleTarget.empty())
+			if (!singleTarget.empty()) {
 				// TODO: Include more info about the target (desc, engine name, ...) ???
-				return Common::Error(Common::kEnginePluginNotSupportSaves,
-				                     Common::String::format("target '%s', gameid '%s'", i->c_str(), qualifiedGameId.c_str()));
+				result = Common::Error(Common::kEnginePluginNotSupportSaves,
+				                     Common::String::format("target '%s', gameid '%s'", i->target.c_str(), qualifiedGameId.c_str()));
+				break;
+			}
 			continue;
 		}
 
 		// Query the plugin for a list of saved games
-		SaveStateList saveList = metaEngine.listSaves(i->c_str());
+		SaveStateList saveList = metaEngine.listSaves(i->target.c_str());
 
 		if (!saveList.empty()) {
 			// TODO: Include more info about the target (desc, engine name, ...) ???
 			if (atLeastOneFound)
 				printf("\n");
-			printf("Save states for target '%s' (gameid '%s'):\n", i->c_str(), qualifiedGameId.c_str());
+			printf("Save states for target '%s' (gameid '%s'):\n", i->target.c_str(), qualifiedGameId.c_str());
 			printf("  Slot Description                                           \n"
 					   "  ---- ------------------------------------------------------\n");
 
@@ -1407,15 +1413,17 @@ static Common::Error listSaves(const Common::String &singleTarget) {
 		} else {
 			// If the target was specified, indicate no save games were found for it. Otherwise just skip it.
 			if (!singleTarget.empty())
-				printf("There are no save states for target '%s' (gameid '%s'):\n", i->c_str(), qualifiedGameId.c_str());
+				printf("There are no save states for target '%s' (gameid '%s'):\n", i->target.c_str(), qualifiedGameId.c_str());
 		}
 	}
 
 	// Revert to the old active domain
 	ConfMan.setActiveDomain(oldDomain);
 
-	if (!atLeastOneFound && singleTarget.empty())
+	if (!atLeastOneFound && singleTarget.empty() && result.getCode() == Common::kNoError)
 		printf("No save states could be found.\n");
+
+	PluginMan.loadDetectionPlugin(); // only for uncached manager
 
 	return result;
 }
@@ -1451,7 +1459,7 @@ static void listAudioDevices() {
 
 /** Dump MD5s from detection entries into STDOUT */
 static void dumpAllDetectionEntries() {
-	const PluginList &plugins = EngineMan.getPlugins();
+	const PluginList &plugins = EngineMan.getPlugins(PLUGIN_TYPE_ENGINE_DETECTION);
 
 	printf("scummvm (\n");
 	printf("\tauthor \"scummvm\"\n");
@@ -2019,7 +2027,7 @@ bool processSettings(Common::String &command, Common::StringMap &settings, Commo
 		if (command == "md5" && settings.contains("md5-engine")) {
 			Common::String engineID = settings["md5-engine"];
 
-			const Plugin *plugin = EngineMan.findPlugin(engineID);
+			const Plugin *plugin = EngineMan.findDetectionPlugin(engineID);
 			if (!plugin) {
 				warning("'%s' is an invalid engine ID. Use the --list-engines command to list supported engine IDs", engineID.c_str());
 				return true;

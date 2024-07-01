@@ -179,9 +179,9 @@ static const char *const directoryGlobs[] = {
 	nullptr
 };
 
-class SciMetaEngineDetection : public AdvancedMetaEngineDetection {
+class SciMetaEngineDetection : public AdvancedMetaEngineDetection<ADGameDescription> {
 public:
-	SciMetaEngineDetection() : AdvancedMetaEngineDetection(Sci::SciGameDescriptions, sizeof(ADGameDescription), s_sciGameTitles) {
+	SciMetaEngineDetection() : AdvancedMetaEngineDetection(Sci::SciGameDescriptions, s_sciGameTitles) {
 		_maxScanDepth = 3;
 		_directoryGlobs = directoryGlobs;
 		// Use SCI fallback detection results instead of the partial matches found by
@@ -251,12 +251,7 @@ ADDetectedGame SciMetaEngineDetection::fallbackDetect(const FileMap &allFiles, c
 		}
 	}
 
-	const Plugin *metaEnginePlugin = EngineMan.findPlugin(getName());
-	if (!metaEnginePlugin) {
-		return ADDetectedGame();
-	}
-
-	const Plugin *enginePlugin = PluginMan.getEngineFromMetaEngine(metaEnginePlugin);
+	const Plugin *enginePlugin = PluginMan.findEnginePlugin(getName());
 	if (!enginePlugin) {
 		static bool warn = true;
 		if (warn) {
@@ -266,7 +261,7 @@ ADDetectedGame SciMetaEngineDetection::fallbackDetect(const FileMap &allFiles, c
 		return ADDetectedGame();
 	}
 
-	ADDetectedGame game = enginePlugin->get<AdvancedMetaEngine>().fallbackDetectExtern(_md5Bytes, allFiles, fslist);
+	ADDetectedGame game = enginePlugin->get<AdvancedMetaEngineBase>().fallbackDetectExtern(_md5Bytes, allFiles, fslist);
 	if (!game.desc) {
 		return game;
 	}
