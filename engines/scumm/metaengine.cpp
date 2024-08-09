@@ -751,6 +751,15 @@ static const ExtraGuiOption enableCopyProtection = {
 	0
 };
 
+static const ExtraGuiOption mmDemoObjectLabelsOption = {
+	_s("Enable demo/kiosk mode"),
+	_s("Enable demo/kiosk mode in the full retail version of Maniac Mansion."),
+	"enable_demo_mode",
+	false,
+	0,
+	0
+};
+
 const ExtraGuiOptions ScummMetaEngine::getExtraGuiOptions(const Common::String &target) const {
 	ExtraGuiOptions options;
 	// Query the GUI options
@@ -797,7 +806,12 @@ const ExtraGuiOptions ScummMetaEngine::getExtraGuiOptions(const Common::String &
 			options.push_back(fmtownsForceHiResMode);
 #endif
 	}
-
+    if (target.empty() || gameid == "maniac") {
+		// The kiosk demo is only available on Maniac v1
+		bool isValidTarget = !extra.contains("Demo") && extra.contains("V1");
+		if (isValidTarget)
+			options.push_back(mmDemoObjectLabelsOption);
+    }
 	// The Steam Mac versions of Loom and Indy 3 are more akin to the VGA
 	// DOS versions, and that's how ScummVM usually sees them. But that
 	// rebranding does not happen until later.
